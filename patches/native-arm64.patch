@@ -1,0 +1,85 @@
+--- a/scripts/general.sh
++++ b/scripts/general.sh
+@@ -496,6 +496,11 @@
+ #
+ fetch_from_repo()
+ {
++	# OFFLINE_NOOP_PATCH: native build uses pre-seeded local sources
++	if [ "${OFFLINE_WORK}" = "yes" ]; then
++		display_alert "Offline: using local sources" "" "info"
++		return 0
++	fi
+ 	local url=$1
+ 	local dir=$2
+ 	local ref=$3
+@@ -1407,6 +1412,11 @@
+ {
+ 	display_alert "Preparing" "host" "info"
+ 
++	# --- native arm64 build support (orangepi-build-native) ---
++	if [[ $(dpkg --print-architecture) == arm64 ]]; then
++		export SKIP_EXTERNAL_TOOLCHAINS=yes
++	fi
++
+ 	# The 'offline' variable must always be set to 'true' or 'false'
+ 	if [ "$OFFLINE_WORK" == "yes" ]; then
+ 		local offline=true
+@@ -1449,7 +1459,7 @@
+ 
+   elif [[ $(dpkg --print-architecture) == arm64 ]]; then
+ 
+-	hostdeps+=" gcc-arm-linux-gnueabi gcc-arm-none-eabi libc6 libc6-amd64-cross qemu"
++	hostdeps+=" gcc-arm-linux-gnueabi gcc-arm-none-eabi libc6 libc6-amd64-cross qemu-user-static binfmt-support"
+ 
+   else
+ 
+--- a/scripts/compilation.sh
++++ b/scripts/compilation.sh
+@@ -188,6 +188,11 @@
+ 
+ 		advanced_patch "u-boot" "$BOOTPATCHDIR" "$BOARD" "$target_patchdir" "$BRANCH" "${LINUXFAMILY}-${BOARD}-${BRANCH}"
+ 
++		# NATIVE_ARM64_UBOOT_FIX: vendor tree ships x86 dtc binary and uses -Werror
++		[ -x /usr/bin/dtc ] && export DTC=/usr/bin/dtc
++		sed -i "s/ -Werror$/ -Wno-error/" Makefile 2>/dev/null || true
++		rm -f scripts/dtc/dtc
++
+ 		# create patch for manual source changes
+ 		[[ $CREATE_PATCHES == yes ]] && userpatch_create "u-boot"
+ 
+@@ -371,6 +376,8 @@
+ 
+ compile_kernel()
+ {
++	# NATIVE_ARM64_KERNEL_DTC_FIX: use kernel-built dtc, not host dtc
++	unset DTC
+ 	if [[ $CLEAN_LEVEL == *make* ]]; then
+ 		display_alert "Cleaning" "$LINUXSOURCEDIR" "info"
+ 		(cd ${LINUXSOURCEDIR}; make ARCH="${ARCHITECTURE}" clean >/dev/null 2>&1)
+--- a/scripts/debootstrap.sh
++++ b/scripts/debootstrap.sh
+@@ -655,6 +655,13 @@
+ 	check_loop_device "$LOOP"
+ 
+ 	losetup -P $LOOP ${SDCARD}.raw
++	# NATIVE_ARM64_LOOP_FIX: ensure partition device nodes exist inside chroot
++	partprobe $LOOP >/dev/null 2>&1 || true
++	for _i in 1 2 3 4 5 6; do [ -b ${LOOP}p1 ] && break; sleep 1; done
++	if [ ! -b ${LOOP}p1 ]; then
++		local _d=$(cat /sys/block/$(basename $LOOP)/$(basename $LOOP)p1/dev 2>/dev/null)
++		if [ -n "$_d" ]; then mknod ${LOOP}p1 b ${_d%:*} ${_d#*:} 2>/dev/null || true; fi
++	fi
+ 
+ 	# loop device was grabbed here, unlock
+ 	flock -u $FD
+--- a/external/config/sources/families/sun60iw2.conf
++++ b/external/config/sources/families/sun60iw2.conf
+@@ -182,7 +182,7 @@
+ uboot_custom_postprocess()
+ {
+ 
+-	if [[ ${BRANCH} =~ legacy|current && $(dpkg --print-architecture) == amd64 ]]; then
++	if [[ ${BRANCH} =~ legacy|current ]] && [[ $(dpkg --print-architecture) == amd64 || $(dpkg --print-architecture) == arm64 ]]; then
+ 
+ 		local BIN_PATH="${EXTER}/packages/pack-uboot/${BOARDFAMILY}/bin"
+ 		rm dts/*.dts sys_config ${BOARD}-u-boot-current.dtb -r 
