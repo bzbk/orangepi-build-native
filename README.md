@@ -19,7 +19,17 @@
 | 耗时 | 首次全量约 ~1.5h；ccache 热之后完整重建 **17–25 分钟** |
 
 产物：`Orangepizero3w_1.0.2_debian_bookworm_server_linux6.6.98.img`
-SHA256 `dfb27109504ef42d8ff2c983c1a161d15e6bd801a9ae2f6b4330d1856c5724b1`
+（原始构建 SHA256 `dfb27109504ef42d8ff2c983c1a161d15e6bd801a9ae2f6b4330d1856c5724b1`；
+注入 aic8800 固件 + WiFi 预配置后为 `eefa50bd9491ed34d2a04819268874248ab254c45e0ede20b8f6e52a89732f62`）
+
+> **实机验证（2026-10-20 晚）**：该镜像已烧入 TF 卡在**真实 Orange Pi Zero 3W**
+> 上启动成功——U-Boot → boot.scr → 我们编译的 uImage/initrd → 6.6.98 内核 →
+> Debian bookworm 自动登录；WiFi（GoforLib）自动连接，IP 192.168.10.242，
+> SSH 免密可用；首启自动扩容到 116G。
+>
+> 注意：上游 `orangepi-firmware` deb 不含 aic8800 固件（见
+> [docs/KNOWN-ISSUES.md](docs/KNOWN-ISSUES.md)），需要用
+> `scripts/inject-firmware.sh` 补进镜像，否则没有 `wlan0`。
 
 ## 上游的 x86 假设 & 本补丁的修复
 

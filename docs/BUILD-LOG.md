@@ -31,3 +31,14 @@ Upstream: orangepi-build @ a05b3b4d5fc0dd4eb859f64c8a60f9b2c9e33cb1
 - 15:40 first "successful" build (image had empty rootfs partition — silent failure)
 - 17:40 loop-device fix → clean rebuild
 - 18:05 final image done (17 min with warm ccache), verified
+
+## Real-hardware validation (same day, evening)
+
+- Flashed the built image to a 128 GB TF card (partition start LBA 65536, boot0
+  `eGON.BT0` verified) and booted on a real **Orange Pi Zero 3W**:
+  U-Boot → `boot.scr` → uImage (our 6.6.98-sun60iw2 build) → initramfs → Debian
+  bookworm auto-login as `orangepi` → SSH via WiFi (192.168.10.242) works.
+- Rootfs auto-expanded to the full 116 GiB on first boot.
+- Found and fixed a missing-firmware issue (aic8800) — see docs/KNOWN-ISSUES.md.
+- Final image with firmware + WiFi preconfigured:
+  SHA256 `eefa50bd9491ed34d2a04819268874248ab254c45e0ede20b8f6e52a89732f62`
